@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            static_triplet: x64-linux-static
+          - os: ubuntu-22.04-arm64
+            static_triplet: arm64-linux-static
+          - os: macos-14
+            static_triplet: arm64-osx
+          - os: windows-2022
+            static_triplet: x64-windows-static
+    env:
+      VCPKG_DISABLE_METRICS: 1
+      VCPKG_FEATURE_FLAGS: manifests,registries
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone vcpkg (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$HOME/vcpkg"
+          "$HOME/vcpkg/bootstrap-vcpkg.sh"
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Clone vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$env:USERPROFILE\vcpkg"
+          & "$env:USERPROFILE\vcpkg\bootstrap-vcpkg.bat"
+          "VCPKG_ROOT=$env:USERPROFILE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure and build (vcpkg)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build
+
+      - name: Configure and build (vcpkg)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
+          cmake --build build
+
+      - name: Run binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./build/test_gp
+
+      - name: Run binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\test_gp.exe
+
+      - name: Configure and build (static)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake -S . -B build-static -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
+          cmake --build build-static
+
+      - name: Configure and build (static)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build-static -G Ninja `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
+          cmake --build build-static
+
+      - name: Run binary (static)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./build-static/test_gp
+
+      - name: Run binary (static)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build-static\test_gp.exe
