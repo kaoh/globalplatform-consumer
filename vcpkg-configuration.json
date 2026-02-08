@@ -1,0 +1,12 @@
+{
+  "registries": [
+    {
+      "kind": "git",
+      "baseline": "fd4199d65c3dabbc653f5e741b77753252b7eab6",
+      "repository": "https://github.com/kaoh/globalplatform-vcpkg-registry",
+      "packages": [
+        "globalplatform"
+      ]
+    }
+  ]
+}
