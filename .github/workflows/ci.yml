@@ -34,35 +34,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpcsclite-dev ninja-build pcscd
 
-      - name: Start pcscd (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          sudo systemctl start pcscd || sudo pcscd
-
-      - name: Start PC/SC service (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          sudo launchctl kickstart -k system/com.apple.pcscd \
-            || sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.pcscd.plist \
-            || {
-              PCSC_BIN="$PCSC_PREFIX/sbin/pcscd"
-              if [ ! -x "$PCSC_BIN" ]; then
-                PCSC_BIN="$(command -v pcscd || true)"
-              fi
-              if [ -n "$PCSC_BIN" ]; then
-                sudo "$PCSC_BIN" -f >/tmp/pcscd.log 2>&1 &
-                sleep 2
-              fi
-            }
-
-      - name: Start PC/SC service (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Start-Service -Name SCardSvr
-
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -71,6 +42,37 @@ jobs:
           PCSC_PREFIX="$(brew --prefix pcsc-lite)"
           echo "PKG_CONFIG_PATH=$PCSC_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
           echo "PCSC_PREFIX=$PCSC_PREFIX" >> "$GITHUB_ENV"
+
+      - name: Start pcscd (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo systemctl start pcscd || sudo pcscd
+
+      - name: Start PC/SC system service (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          sudo launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.pcscd.plist || true
+          sudo launchctl enable system/com.apple.pcscd || true
+          sudo launchctl kickstart -k system/com.apple.pcscd || true
+          if ! sudo launchctl print system/com.apple.pcscd >/dev/null 2>&1; then
+            echo "PC/SC system service not available; trying pcscd"
+            PCSC_BIN="$PCSC_PREFIX/sbin/pcscd"
+            if [ ! -x "$PCSC_BIN" ]; then
+              PCSC_BIN="$(command -v pcscd || true)"
+            fi
+            if [ -n "$PCSC_BIN" ]; then
+              sudo "$PCSC_BIN" -f >/tmp/pcscd.log 2>&1 &
+              sleep 2
+            fi
+          fi
+
+      - name: Start PC/SC service (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Start-Service -Name SCardSvr
 
       - name: Clone vcpkg (Unix)
         if: runner.os != 'Windows'
@@ -91,6 +93,24 @@ jobs:
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Restore vcpkg root (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcpkgRoot = "$env:USERPROFILE\vcpkg"
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Ensure MSVC tools in PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcBin = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64'
+          $cl = Join-Path $vcBin 'cl.exe'
+          if (-not (Test-Path $cl)) {
+            throw "cl.exe not found at $cl"
+          }
+          $vcBin | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Set vcpkg generator (Windows)
         if: runner.os == 'Windows'
@@ -121,8 +141,12 @@ jobs:
           if (-not $nmake) {
             throw "nmake.exe not found in PATH"
           }
+          $env:CC = "cl"
+          $env:CXX = "cl"
           cmake -S . -B build -G "NMake Makefiles" `
             -DCMAKE_MAKE_PROGRAM="$nmake" `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build
 
@@ -200,8 +224,12 @@ jobs:
           if (-not $nmake) {
             throw "nmake.exe not found in PATH"
           }
+          $env:CC = "cl"
+          $env:CXX = "cl"
           cmake -S . -B build-static -G "NMake Makefiles" `
             -DCMAKE_MAKE_PROGRAM="$nmake" `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
