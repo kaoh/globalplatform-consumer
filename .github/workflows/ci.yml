@@ -24,6 +24,7 @@ jobs:
     env:
       VCPKG_DISABLE_METRICS: 1
       VCPKG_FEATURE_FLAGS: manifests,registries
+      VCPKG_OVERLAY_TRIPLETS: ${{ github.workspace }}/triplets
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +63,7 @@ jobs:
           brew install pcsc-lite pkg-config
           PCSC_PREFIX="$(brew --prefix pcsc-lite)"
           echo "PKG_CONFIG_PATH=$PCSC_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "PCSC_PREFIX=$PCSC_PREFIX" >> "$GITHUB_ENV"
 
       - name: Clone vcpkg (Unix)
         if: runner.os != 'Windows'
@@ -89,10 +91,12 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             GEN="Unix Makefiles"
+            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib"
           else
             GEN="Ninja"
+            EXTRA_CMAKE_ARGS=""
           fi
-          cmake -S . -B build -G "$GEN" \
+          cmake -S . -B build -G "$GEN" $EXTRA_CMAKE_ARGS \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
           cmake --build build
 
@@ -153,10 +157,12 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             GEN="Unix Makefiles"
+            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib"
           else
             GEN="Ninja"
+            EXTRA_CMAKE_ARGS=""
           fi
-          cmake -S . -B build-static -G "$GEN" \
+          cmake -S . -B build-static -G "$GEN" $EXTRA_CMAKE_ARGS \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
