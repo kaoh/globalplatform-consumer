@@ -46,7 +46,16 @@ jobs:
         run: |
           sudo launchctl kickstart -k system/com.apple.pcscd \
             || sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.pcscd.plist \
-            || { PCSC_BIN="$(command -v pcscd || true)"; [ -n "$PCSC_BIN" ] && sudo "$PCSC_BIN"; }
+            || {
+              PCSC_BIN="$PCSC_PREFIX/sbin/pcscd"
+              if [ ! -x "$PCSC_BIN" ]; then
+                PCSC_BIN="$(command -v pcscd || true)"
+              fi
+              if [ -n "$PCSC_BIN" ]; then
+                sudo "$PCSC_BIN" -f >/tmp/pcscd.log 2>&1 &
+                sleep 2
+              fi
+            }
 
       - name: Start PC/SC service (Windows)
         if: runner.os == 'Windows'
@@ -83,11 +92,11 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Ninja (Windows)
+      - name: Set vcpkg generator (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install ninja -y
+          "VCPKG_CMAKE_GENERATOR=NMake Makefiles" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Configure and build (vcpkg, Unix)
         if: runner.os != 'Windows'
@@ -108,7 +117,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake -S . -B build -G Ninja `
+          $nmake = (Get-Command nmake.exe -ErrorAction SilentlyContinue).Source
+          if (-not $nmake) {
+            throw "nmake.exe not found in PATH"
+          }
+          cmake -S . -B build -G "NMake Makefiles" `
+            -DCMAKE_MAKE_PROGRAM="$nmake" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build
 
@@ -182,7 +196,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake -S . -B build-static -G Ninja `
+          $nmake = (Get-Command nmake.exe -ErrorAction SilentlyContinue).Source
+          if (-not $nmake) {
+            throw "nmake.exe not found in PATH"
+          }
+          cmake -S . -B build-static -G "NMake Makefiles" `
+            -DCMAKE_MAKE_PROGRAM="$nmake" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
