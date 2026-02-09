@@ -89,7 +89,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             GEN="Unix Makefiles"
-            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib"
+            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib -DCMAKE_EXE_LINKER_FLAGS=-L$PCSC_PREFIX/lib"
           else
             GEN="Ninja"
             EXTRA_CMAKE_ARGS=""
@@ -155,7 +155,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             GEN="Unix Makefiles"
-            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib"
+            EXTRA_CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$PCSC_PREFIX -DCMAKE_LIBRARY_PATH=$PCSC_PREFIX/lib -DCMAKE_EXE_LINKER_FLAGS=-L$PCSC_PREFIX/lib"
           else
             GEN="Ninja"
             EXTRA_CMAKE_ARGS=""
