@@ -187,14 +187,9 @@ jobs:
         shell: pwsh
         run: |
           $binRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\bin'
-          $debugBinRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\debug\bin'
           if (Test-Path $binRoot) {
             Copy-Item (Join-Path $binRoot '*.dll') -Destination .\build -Force -ErrorAction SilentlyContinue
             $env:PATH = "$binRoot;$env:PATH"
-          }
-          if (Test-Path $debugBinRoot) {
-            Copy-Item (Join-Path $debugBinRoot '*.dll') -Destination .\build -Force -ErrorAction SilentlyContinue
-            $env:PATH = "$debugBinRoot;$env:PATH"
           }
           if (-not (Test-Path .\build\test_gp.exe)) {
             Get-ChildItem -Recurse -Filter test_gp.exe
@@ -205,13 +200,18 @@ jobs:
             Write-Host "---- test_gp.exe dependencies ----"
             & $dumpbin /dependents .\build\test_gp.exe
             Write-Host "---- end ----"
-            $plugin = Get-ChildItem -Recurse -Filter 'gppcscconnectionplugin*.dll' | Select-Object -First 1
-            if ($plugin) {
-              Write-Host "---- $($plugin.FullName) dependencies ----"
-              & $dumpbin /dependents $plugin.FullName
+            if (Test-Path .\build\globalplatform.dll) {
+              Write-Host "---- globalplatform.dll dependencies ----"
+              & $dumpbin /dependents .\build\globalplatform.dll
+              Write-Host "---- end ----"
+            }
+            $plugin = Join-Path $binRoot 'gppcscconnectionplugin.dll'
+            if (Test-Path $plugin) {
+              Write-Host "---- $plugin dependencies ----"
+              & $dumpbin /dependents $plugin
               Write-Host "---- end ----"
             } else {
-              Write-Host "gppcscconnectionplugin dll not found"
+              Write-Host "gppcscconnectionplugin.dll not found in $binRoot"
             }
           } else {
             Write-Host "dumpbin.exe not found"
@@ -222,7 +222,8 @@ jobs:
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build\test_gp.exe
           $rc = $LASTEXITCODE
-          Write-Host ("test_gp exit code: {0} (0x{1:X8})" -f $rc, [uint32]$rc)
+          $rcHex = "0x{0:X8}" -f ([uint32]($rc -band 0xffffffff))
+          Write-Host "test_gp exit code: $rc ($rcHex)"
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
@@ -303,14 +304,9 @@ jobs:
         shell: pwsh
         run: |
           $binRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\bin'
-          $debugBinRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\debug\bin'
           if (Test-Path $binRoot) {
             Copy-Item (Join-Path $binRoot '*.dll') -Destination .\build-static -Force -ErrorAction SilentlyContinue
             $env:PATH = "$binRoot;$env:PATH"
-          }
-          if (Test-Path $debugBinRoot) {
-            Copy-Item (Join-Path $debugBinRoot '*.dll') -Destination .\build-static -Force -ErrorAction SilentlyContinue
-            $env:PATH = "$debugBinRoot;$env:PATH"
           }
           if (-not (Test-Path .\build-static\test_gp.exe)) {
             Get-ChildItem -Recurse -Filter test_gp.exe
@@ -321,13 +317,18 @@ jobs:
             Write-Host "---- test_gp.exe dependencies (static) ----"
             & $dumpbin /dependents .\build-static\test_gp.exe
             Write-Host "---- end ----"
-            $plugin = Get-ChildItem -Recurse -Filter 'gppcscconnectionplugin*.dll' | Select-Object -First 1
-            if ($plugin) {
-              Write-Host "---- $($plugin.FullName) dependencies ----"
-              & $dumpbin /dependents $plugin.FullName
+            if (Test-Path .\build-static\globalplatform.dll) {
+              Write-Host "---- globalplatform.dll dependencies (static) ----"
+              & $dumpbin /dependents .\build-static\globalplatform.dll
+              Write-Host "---- end ----"
+            }
+            $plugin = Join-Path $binRoot 'gppcscconnectionplugin.dll'
+            if (Test-Path $plugin) {
+              Write-Host "---- $plugin dependencies ----"
+              & $dumpbin /dependents $plugin
               Write-Host "---- end ----"
             } else {
-              Write-Host "gppcscconnectionplugin dll not found"
+              Write-Host "gppcscconnectionplugin.dll not found in $binRoot"
             }
           } else {
             Write-Host "dumpbin.exe not found"
@@ -338,7 +339,8 @@ jobs:
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build-static\test_gp.exe
           $rc = $LASTEXITCODE
-          Write-Host ("test_gp exit code: {0} (0x{1:X8})" -f $rc, [uint32]$rc)
+          $rcHex = "0x{0:X8}" -f ([uint32]($rc -band 0xffffffff))
+          Write-Host "test_gp exit code: $rc ($rcHex)"
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
