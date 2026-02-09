@@ -15,8 +15,6 @@ jobs:
         include:
           - os: ubuntu-22.04
             static_triplet: x64-linux-static
-          - os: ubuntu-22.04-arm64
-            static_triplet: arm64-linux-static
           - os: macos-14
             static_triplet: arm64-osx
           - os: windows-2022
