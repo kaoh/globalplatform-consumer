@@ -200,13 +200,29 @@ jobs:
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build output"
           }
+          $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
+          if ($dumpbin) {
+            Write-Host "---- test_gp.exe dependencies ----"
+            & $dumpbin /dependents .\build\test_gp.exe
+            Write-Host "---- end ----"
+            $plugin = Get-ChildItem -Recurse -Filter 'gppcscconnectionplugin*.dll' | Select-Object -First 1
+            if ($plugin) {
+              Write-Host "---- $($plugin.FullName) dependencies ----"
+              & $dumpbin /dependents $plugin.FullName
+              Write-Host "---- end ----"
+            } else {
+              Write-Host "gppcscconnectionplugin dll not found"
+            }
+          } else {
+            Write-Host "dumpbin.exe not found"
+          }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build\test_gp.exe
           $rc = $LASTEXITCODE
-          Write-Host "test_gp exit code: $rc"
+          Write-Host ("test_gp exit code: {0} (0x{1:X8})" -f $rc, [uint32]$rc)
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
@@ -300,13 +316,29 @@ jobs:
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build-static output"
           }
+          $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
+          if ($dumpbin) {
+            Write-Host "---- test_gp.exe dependencies (static) ----"
+            & $dumpbin /dependents .\build-static\test_gp.exe
+            Write-Host "---- end ----"
+            $plugin = Get-ChildItem -Recurse -Filter 'gppcscconnectionplugin*.dll' | Select-Object -First 1
+            if ($plugin) {
+              Write-Host "---- $($plugin.FullName) dependencies ----"
+              & $dumpbin /dependents $plugin.FullName
+              Write-Host "---- end ----"
+            } else {
+              Write-Host "gppcscconnectionplugin dll not found"
+            }
+          } else {
+            Write-Host "dumpbin.exe not found"
+          }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build-static\test_gp.exe
           $rc = $LASTEXITCODE
-          Write-Host "test_gp exit code: $rc"
+          Write-Host ("test_gp exit code: {0} (0x{1:X8})" -f $rc, [uint32]$rc)
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
