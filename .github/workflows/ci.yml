@@ -145,6 +145,7 @@ jobs:
           $env:CXX = "cl"
           cmake -S . -B build -G "NMake Makefiles" `
             -DCMAKE_MAKE_PROGRAM="$nmake" `
+            -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_C_COMPILER=cl `
             -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
@@ -199,6 +200,7 @@ jobs:
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build\test_gp.exe
           $rc = $LASTEXITCODE
+          Write-Host "test_gp exit code: $rc"
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
@@ -236,6 +238,7 @@ jobs:
           $env:CXX = "cl"
           cmake -S . -B build-static -G "NMake Makefiles" `
             -DCMAKE_MAKE_PROGRAM="$nmake" `
+            -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_C_COMPILER=cl `
             -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
@@ -291,6 +294,7 @@ jobs:
           $env:GLOBALPLATFORM_LOGFILE = $log
           & .\build-static\test_gp.exe
           $rc = $LASTEXITCODE
+          Write-Host "test_gp exit code: $rc"
           if (Test-Path $log) {
             Write-Host "---- GLOBALPLATFORM_LOGFILE ($log) ----"
             Get-Content -Path $log
