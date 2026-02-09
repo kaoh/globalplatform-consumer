@@ -28,6 +28,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcsclite-dev ninja-build
+
       - name: Clone vcpkg (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -44,56 +51,70 @@ jobs:
           & "$env:USERPROFILE\vcpkg\bootstrap-vcpkg.bat"
           "VCPKG_ROOT=$env:USERPROFILE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure and build (vcpkg)
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure and build (vcpkg, Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cmake -S . -B build -G Ninja \
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            GEN="Unix Makefiles"
+          else
+            GEN="Ninja"
+          fi
+          cmake -S . -B build -G "$GEN" \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
           cmake --build build
 
-      - name: Configure and build (vcpkg)
+      - name: Configure and build (vcpkg, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake -S . -B build -G Ninja `
+          cmake -S . -B build -G "NMake Makefiles" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build
 
-      - name: Run binary
+      - name: Run binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: ./build/test_gp
 
-      - name: Run binary
+      - name: Run binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: .\build\test_gp.exe
 
-      - name: Configure and build (static)
+      - name: Configure and build (static, Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cmake -S . -B build-static -G Ninja \
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            GEN="Unix Makefiles"
+          else
+            GEN="Ninja"
+          fi
+          cmake -S . -B build-static -G "$GEN" \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
 
-      - name: Configure and build (static)
+      - name: Configure and build (static, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake -S . -B build-static -G Ninja `
+          cmake -S . -B build-static -G "NMake Makefiles" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
 
-      - name: Run binary (static)
+      - name: Run binary (static, Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: ./build-static/test_gp
 
-      - name: Run binary (static)
+      - name: Run binary (static, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: .\build-static\test_gp.exe
