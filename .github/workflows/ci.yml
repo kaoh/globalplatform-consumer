@@ -33,7 +33,27 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev ninja-build
+          sudo apt-get install -y libpcsclite-dev ninja-build pcscd
+
+      - name: Start pcscd (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo systemctl start pcscd || sudo pcscd
+
+      - name: Start PC/SC service (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          sudo launchctl kickstart -k system/com.apple.pcscd \
+            || sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.pcscd.plist \
+            || { PCSC_BIN="$(command -v pcscd || true)"; [ -n "$PCSC_BIN" ] && sudo "$PCSC_BIN"; }
+
+      - name: Start PC/SC service (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Start-Service -Name SCardSvr
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
