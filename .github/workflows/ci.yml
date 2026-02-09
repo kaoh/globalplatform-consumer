@@ -185,6 +185,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $binRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\bin'
+          $debugBinRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\debug\bin'
+          if (Test-Path $binRoot) { $env:PATH = "$binRoot;$env:PATH" }
+          if (Test-Path $debugBinRoot) { $env:PATH = "$debugBinRoot;$env:PATH" }
+          if (-not (Test-Path .\build\test_gp.exe)) {
+            Get-ChildItem -Recurse -Filter test_gp.exe
+            throw "test_gp.exe not found in build output"
+          }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
@@ -269,6 +277,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $binRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\bin'
+          $debugBinRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\debug\bin'
+          if (Test-Path $binRoot) { $env:PATH = "$binRoot;$env:PATH" }
+          if (Test-Path $debugBinRoot) { $env:PATH = "$debugBinRoot;$env:PATH" }
+          if (-not (Test-Path .\build-static\test_gp.exe)) {
+            Get-ChildItem -Recurse -Filter test_gp.exe
+            throw "test_gp.exe not found in build-static output"
+          }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
