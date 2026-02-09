@@ -188,8 +188,14 @@ jobs:
         run: |
           $binRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\bin'
           $debugBinRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\debug\bin'
-          if (Test-Path $binRoot) { $env:PATH = "$binRoot;$env:PATH" }
-          if (Test-Path $debugBinRoot) { $env:PATH = "$debugBinRoot;$env:PATH" }
+          if (Test-Path $binRoot) {
+            Copy-Item (Join-Path $binRoot '*.dll') -Destination .\build -Force -ErrorAction SilentlyContinue
+            $env:PATH = "$binRoot;$env:PATH"
+          }
+          if (Test-Path $debugBinRoot) {
+            Copy-Item (Join-Path $debugBinRoot '*.dll') -Destination .\build -Force -ErrorAction SilentlyContinue
+            $env:PATH = "$debugBinRoot;$env:PATH"
+          }
           if (-not (Test-Path .\build\test_gp.exe)) {
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build output"
@@ -282,8 +288,14 @@ jobs:
         run: |
           $binRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\bin'
           $debugBinRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\debug\bin'
-          if (Test-Path $binRoot) { $env:PATH = "$binRoot;$env:PATH" }
-          if (Test-Path $debugBinRoot) { $env:PATH = "$debugBinRoot;$env:PATH" }
+          if (Test-Path $binRoot) {
+            Copy-Item (Join-Path $binRoot '*.dll') -Destination .\build-static -Force -ErrorAction SilentlyContinue
+            $env:PATH = "$binRoot;$env:PATH"
+          }
+          if (Test-Path $debugBinRoot) {
+            Copy-Item (Join-Path $debugBinRoot '*.dll') -Destination .\build-static -Force -ErrorAction SilentlyContinue
+            $env:PATH = "$debugBinRoot;$env:PATH"
+          }
           if (-not (Test-Path .\build-static\test_gp.exe)) {
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build-static output"
