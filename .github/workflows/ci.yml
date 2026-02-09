@@ -35,6 +35,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpcsclite-dev ninja-build
 
+      - name: Provide libpcsclite pkg-config (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          PCSC_PC_DIR="$RUNNER_TEMP/pcsc-pkgconfig"
+          mkdir -p "$PCSC_PC_DIR"
+          cat > "$PCSC_PC_DIR/libpcsclite.pc" <<'EOF'
+          prefix=/System/Library/Frameworks/PCSC.framework
+          exec_prefix=${prefix}
+          libdir=${prefix}
+          includedir=/System/Library/Frameworks/PCSC.framework/Headers
+
+          Name: libpcsclite
+          Description: macOS PCSC framework
+          Version: 1.9.0
+          Libs: -framework PCSC
+          Cflags: -I${includedir}
+          EOF
+          echo "PKG_CONFIG_PATH=$PCSC_PC_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
       - name: Clone vcpkg (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -72,7 +92,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $nmake = "$env:VCToolsInstallDir\bin\Hostx64\x64\nmake.exe"
+          if (-not (Test-Path $nmake)) {
+            throw "nmake.exe not found at $nmake"
+          }
           cmake -S . -B build -G "NMake Makefiles" `
+            -DCMAKE_MAKE_PROGRAM="$nmake" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build
 
@@ -104,7 +129,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $nmake = "$env:VCToolsInstallDir\bin\Hostx64\x64\nmake.exe"
+          if (-not (Test-Path $nmake)) {
+            throw "nmake.exe not found at $nmake"
+          }
           cmake -S . -B build-static -G "NMake Makefiles" `
+            -DCMAKE_MAKE_PROGRAM="$nmake" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
