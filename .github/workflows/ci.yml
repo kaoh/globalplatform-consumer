@@ -83,6 +83,12 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ninja -y
+
       - name: Configure and build (vcpkg, Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -102,12 +108,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $nmake = "$env:VCToolsInstallDir\bin\Hostx64\x64\nmake.exe"
-          if (-not (Test-Path $nmake)) {
-            throw "nmake.exe not found at $nmake"
-          }
-          cmake -S . -B build -G "NMake Makefiles" `
-            -DCMAKE_MAKE_PROGRAM="$nmake" `
+          cmake -S . -B build -G Ninja `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build
 
@@ -116,6 +117,18 @@ jobs:
         shell: bash
         run: |
           set +e
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            PCSC_REAL_LIB="$PCSC_PREFIX/lib/libpcsclite_real.dylib"
+            if [ ! -f "$PCSC_REAL_LIB" ]; then
+              PCSC_REAL_LIB="$PCSC_PREFIX/lib/libpcsclite.dylib"
+            fi
+            if [ -f "$PCSC_REAL_LIB" ]; then
+              ln -sf "$PCSC_REAL_LIB" "build/libpcsclite_real.so.1"
+              export DYLD_LIBRARY_PATH="$PCSC_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+            else
+              echo "pcsc-lite library not found under $PCSC_PREFIX/lib"
+            fi
+          fi
           LOGFILE="$(mktemp "${RUNNER_TEMP:-/tmp}/globalplatform.XXXXXX.log")"
           export GLOBALPLATFORM_DEBUG=1
           export GLOBALPLATFORM_LOGFILE="$LOGFILE"
@@ -169,12 +182,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $nmake = "$env:VCToolsInstallDir\bin\Hostx64\x64\nmake.exe"
-          if (-not (Test-Path $nmake)) {
-            throw "nmake.exe not found at $nmake"
-          }
-          cmake -S . -B build-static -G "NMake Makefiles" `
-            -DCMAKE_MAKE_PROGRAM="$nmake" `
+          cmake -S . -B build-static -G Ninja `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.static_triplet }}"
           cmake --build build-static
@@ -184,6 +192,18 @@ jobs:
         shell: bash
         run: |
           set +e
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            PCSC_REAL_LIB="$PCSC_PREFIX/lib/libpcsclite_real.dylib"
+            if [ ! -f "$PCSC_REAL_LIB" ]; then
+              PCSC_REAL_LIB="$PCSC_PREFIX/lib/libpcsclite.dylib"
+            fi
+            if [ -f "$PCSC_REAL_LIB" ]; then
+              ln -sf "$PCSC_REAL_LIB" "build-static/libpcsclite_real.so.1"
+              export DYLD_LIBRARY_PATH="$PCSC_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+            else
+              echo "pcsc-lite library not found under $PCSC_PREFIX/lib"
+            fi
+          fi
           LOGFILE="$(mktemp "${RUNNER_TEMP:-/tmp}/globalplatform.XXXXXX.log")"
           export GLOBALPLATFORM_DEBUG=1
           export GLOBALPLATFORM_LOGFILE="$LOGFILE"
