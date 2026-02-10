@@ -222,7 +222,10 @@ jobs:
           $buildDir = Join-Path $PWD 'build'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
+          $env:PATH = "$buildDir;$env:PATH"
           $opensslModulesDir = $null
+          $defaultProviderPath = $null
+          $legacyProviderPath = $null
           $searchRoots = @($installRoot)
           if ($env:VCPKG_ROOT) {
             $searchRoots += (Join-Path $env:VCPKG_ROOT 'installed')
@@ -236,22 +239,43 @@ jobs:
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($modulesDir) {
-              $opensslModulesDir = $modulesDir
+              $opensslModulesDir = $modulesDir.FullName
               break
+            }
+          }
+          foreach ($root in $searchRoots) {
+            if ($defaultProviderPath) {
+              break
+            }
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
             }
             $defaultProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'default.dll' -ErrorAction SilentlyContinue |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($defaultProvider) {
-              $opensslModulesDir = Split-Path $defaultProvider.FullName -Parent
+              $defaultProviderPath = $defaultProvider.FullName
+            }
+          }
+          foreach ($root in $searchRoots) {
+            if ($legacyProviderPath) {
               break
+            }
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
             }
             $legacyProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'legacy.dll' -ErrorAction SilentlyContinue |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($legacyProvider) {
-              $opensslModulesDir = Split-Path $legacyProvider.FullName -Parent
-              break
+              $legacyProviderPath = $legacyProvider.FullName
+            }
+          }
+          if (-not $opensslModulesDir) {
+            if ($defaultProviderPath) {
+              $opensslModulesDir = Split-Path $defaultProviderPath -Parent
+            } elseif ($legacyProviderPath) {
+              $opensslModulesDir = Split-Path $legacyProviderPath -Parent
             }
           }
           if ($opensslModulesDir) {
@@ -269,6 +293,16 @@ jobs:
             Write-Host "OPENSSL_MODULES=$env:OPENSSL_MODULES"
           } else {
             Write-Host "OPENSSL_MODULES not set"
+          }
+          if ($defaultProviderPath) {
+            Write-Host "OpenSSL default provider: $defaultProviderPath"
+          } else {
+            Write-Host "OpenSSL default provider: not found"
+          }
+          if ($legacyProviderPath) {
+            Write-Host "OpenSSL legacy provider: $legacyProviderPath"
+          } else {
+            Write-Host "OpenSSL legacy provider: not found"
           }
           Write-Host "---- build DLL presence ----"
           Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
@@ -547,7 +581,10 @@ jobs:
           $buildDir = Join-Path $PWD 'build-static'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
+          $env:PATH = "$buildDir;$env:PATH"
           $opensslModulesDir = $null
+          $defaultProviderPath = $null
+          $legacyProviderPath = $null
           $searchRoots = @($installRoot)
           if ($env:VCPKG_ROOT) {
             $searchRoots += (Join-Path $env:VCPKG_ROOT 'installed')
@@ -561,22 +598,43 @@ jobs:
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($modulesDir) {
-              $opensslModulesDir = $modulesDir
+              $opensslModulesDir = $modulesDir.FullName
               break
+            }
+          }
+          foreach ($root in $searchRoots) {
+            if ($defaultProviderPath) {
+              break
+            }
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
             }
             $defaultProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'default.dll' -ErrorAction SilentlyContinue |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($defaultProvider) {
-              $opensslModulesDir = Split-Path $defaultProvider.FullName -Parent
+              $defaultProviderPath = $defaultProvider.FullName
+            }
+          }
+          foreach ($root in $searchRoots) {
+            if ($legacyProviderPath) {
               break
+            }
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
             }
             $legacyProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'legacy.dll' -ErrorAction SilentlyContinue |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($legacyProvider) {
-              $opensslModulesDir = Split-Path $legacyProvider.FullName -Parent
-              break
+              $legacyProviderPath = $legacyProvider.FullName
+            }
+          }
+          if (-not $opensslModulesDir) {
+            if ($defaultProviderPath) {
+              $opensslModulesDir = Split-Path $defaultProviderPath -Parent
+            } elseif ($legacyProviderPath) {
+              $opensslModulesDir = Split-Path $legacyProviderPath -Parent
             }
           }
           if ($opensslModulesDir) {
@@ -594,6 +652,16 @@ jobs:
             Write-Host "OPENSSL_MODULES=$env:OPENSSL_MODULES"
           } else {
             Write-Host "OPENSSL_MODULES not set"
+          }
+          if ($defaultProviderPath) {
+            Write-Host "OpenSSL default provider: $defaultProviderPath"
+          } else {
+            Write-Host "OpenSSL default provider: not found"
+          }
+          if ($legacyProviderPath) {
+            Write-Host "OpenSSL legacy provider: $legacyProviderPath"
+          } else {
+            Write-Host "OpenSSL legacy provider: not found"
           }
           Write-Host "---- build-static DLL presence ----"
           Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
