@@ -222,12 +222,17 @@ jobs:
           $buildDir = Join-Path $PWD 'build'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
-          $opensslModulesSrc = Join-Path $binRoot 'ossl-modules'
-          $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
-          if (Test-Path $opensslModulesSrc) {
-            Copy-Item $opensslModulesSrc -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+          $opensslModulesDir = Get-ChildItem -Path $installRoot -Recurse -Directory -Filter 'ossl-modules' |
+            Where-Object { $_.FullName -notmatch '\\debug\\' } |
+            Select-Object -First 1
+          if ($opensslModulesDir) {
+            $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
+            Copy-Item $opensslModulesDir.FullName -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
             $env:OPENSSL_MODULES = $opensslModulesDest
             Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
+            Write-Host "OpenSSL modules: $($opensslModulesDir.FullName) -> $opensslModulesDest"
+          } else {
+            Write-Host "OpenSSL modules not found under $installRoot"
           }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
@@ -513,12 +518,17 @@ jobs:
           $buildDir = Join-Path $PWD 'build-static'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
-          $opensslModulesSrc = Join-Path $binRoot 'ossl-modules'
-          $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
-          if (Test-Path $opensslModulesSrc) {
-            Copy-Item $opensslModulesSrc -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+          $opensslModulesDir = Get-ChildItem -Path $installRoot -Recurse -Directory -Filter 'ossl-modules' |
+            Where-Object { $_.FullName -notmatch '\\debug\\' } |
+            Select-Object -First 1
+          if ($opensslModulesDir) {
+            $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
+            Copy-Item $opensslModulesDir.FullName -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
             $env:OPENSSL_MODULES = $opensslModulesDest
             Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
+            Write-Host "OpenSSL modules: $($opensslModulesDir.FullName) -> $opensslModulesDest"
+          } else {
+            Write-Host "OpenSSL modules not found under $installRoot"
           }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
