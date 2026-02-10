@@ -193,13 +193,29 @@ jobs:
             $env:PATH = "$binRoot;$env:PATH"
           }
           $plugin = $null
+          $globalplatform = $null
           if (Test-Path $installRoot) {
+            $globalplatform = Get-ChildItem -Path $installRoot -Recurse -Filter 'globalplatform.dll' |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($globalplatform) {
+              Copy-Item $globalplatform.FullName -Destination .\build -Force -ErrorAction SilentlyContinue
+              $env:PATH = "$(Split-Path $globalplatform.FullName -Parent);$env:PATH"
+            } else {
+              Write-Host "globalplatform.dll not found under $installRoot"
+            }
             $plugin = Get-ChildItem -Path $installRoot -Recurse -Filter 'gppcscconnectionplugin.dll' |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($plugin) {
               Copy-Item $plugin.FullName -Destination .\build -Force -ErrorAction SilentlyContinue
-              $env:PATH = "$(Split-Path $plugin.FullName -Parent);$env:PATH"
+              $pluginDir = Split-Path $plugin.FullName -Parent
+              $env:PATH = "$pluginDir;$env:PATH"
+              if ($env:OPGP_PLUGIN_PATH) {
+                $env:OPGP_PLUGIN_PATH = "$pluginDir;$env:OPGP_PLUGIN_PATH"
+              } else {
+                $env:OPGP_PLUGIN_PATH = $pluginDir
+              }
             } else {
               Write-Host "gppcscconnectionplugin.dll not found under $installRoot"
             }
@@ -213,9 +229,14 @@ jobs:
             Write-Host "---- test_gp.exe dependencies ----"
             & $dumpbin /dependents .\build\test_gp.exe
             Write-Host "---- end ----"
-            if (Test-Path .\build\globalplatform.dll) {
+            $globalplatformCopy = Join-Path $PWD 'build\globalplatform.dll'
+            if (Test-Path $globalplatformCopy) {
               Write-Host "---- globalplatform.dll dependencies ----"
-              & $dumpbin /dependents .\build\globalplatform.dll
+              & $dumpbin /dependents $globalplatformCopy
+              Write-Host "---- end ----"
+            } elseif ($globalplatform) {
+              Write-Host "---- $($globalplatform.FullName) dependencies ----"
+              & $dumpbin /dependents $globalplatform.FullName
               Write-Host "---- end ----"
             }
             if ($plugin) {
@@ -321,13 +342,29 @@ jobs:
             $env:PATH = "$binRoot;$env:PATH"
           }
           $plugin = $null
+          $globalplatform = $null
           if (Test-Path $installRoot) {
+            $globalplatform = Get-ChildItem -Path $installRoot -Recurse -Filter 'globalplatform.dll' |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($globalplatform) {
+              Copy-Item $globalplatform.FullName -Destination .\build-static -Force -ErrorAction SilentlyContinue
+              $env:PATH = "$(Split-Path $globalplatform.FullName -Parent);$env:PATH"
+            } else {
+              Write-Host "globalplatform.dll not found under $installRoot"
+            }
             $plugin = Get-ChildItem -Path $installRoot -Recurse -Filter 'gppcscconnectionplugin.dll' |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
               Select-Object -First 1
             if ($plugin) {
               Copy-Item $plugin.FullName -Destination .\build-static -Force -ErrorAction SilentlyContinue
-              $env:PATH = "$(Split-Path $plugin.FullName -Parent);$env:PATH"
+              $pluginDir = Split-Path $plugin.FullName -Parent
+              $env:PATH = "$pluginDir;$env:PATH"
+              if ($env:OPGP_PLUGIN_PATH) {
+                $env:OPGP_PLUGIN_PATH = "$pluginDir;$env:OPGP_PLUGIN_PATH"
+              } else {
+                $env:OPGP_PLUGIN_PATH = $pluginDir
+              }
             } else {
               Write-Host "gppcscconnectionplugin.dll not found under $installRoot"
             }
@@ -341,9 +378,14 @@ jobs:
             Write-Host "---- test_gp.exe dependencies (static) ----"
             & $dumpbin /dependents .\build-static\test_gp.exe
             Write-Host "---- end ----"
-            if (Test-Path .\build-static\globalplatform.dll) {
+            $globalplatformCopy = Join-Path $PWD 'build-static\globalplatform.dll'
+            if (Test-Path $globalplatformCopy) {
               Write-Host "---- globalplatform.dll dependencies (static) ----"
-              & $dumpbin /dependents .\build-static\globalplatform.dll
+              & $dumpbin /dependents $globalplatformCopy
+              Write-Host "---- end ----"
+            } elseif ($globalplatform) {
+              Write-Host "---- $($globalplatform.FullName) dependencies ----"
+              & $dumpbin /dependents $globalplatform.FullName
               Write-Host "---- end ----"
             }
             if ($plugin) {
