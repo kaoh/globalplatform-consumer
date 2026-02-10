@@ -222,13 +222,27 @@ jobs:
           $buildDir = Join-Path $PWD 'build'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
+          $opensslModulesSrc = Join-Path $binRoot 'ossl-modules'
+          $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
+          if (Test-Path $opensslModulesSrc) {
+            Copy-Item $opensslModulesSrc -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+            $env:OPENSSL_MODULES = $opensslModulesDest
+            Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
+          }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
+          if ($env:OPENSSL_MODULES) {
+            Write-Host "OPENSSL_MODULES=$env:OPENSSL_MODULES"
+          } else {
+            Write-Host "OPENSSL_MODULES not set"
+          }
           Write-Host "---- build DLL presence ----"
           Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
           Write-Host "globalplatform.dll: $(Test-Path $globalplatformCopy)"
           Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
           Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
+          Write-Host "legacy.dll: $(Test-Path (Join-Path $buildDir 'legacy.dll'))"
+          Write-Host "default.dll: $(Test-Path (Join-Path $buildDir 'default.dll'))"
           Write-Host "---- end ----"
           $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
           if ($dumpbin) {
@@ -267,6 +281,14 @@ jobs:
                 }
               }
               return $deps
+            }
+            function Is-VirtualApiSet {
+              param([string]$Name)
+              if (-not $Name) {
+                return $false
+              }
+              $lower = $Name.ToLowerInvariant()
+              return $lower.StartsWith('api-ms-') -or $lower.StartsWith('ext-ms-')
             }
 
             $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
@@ -330,6 +352,9 @@ jobs:
             while ($queue.Count -gt 0) {
               $file = $queue.Dequeue()
               foreach ($dep in (Get-Dependents -Path $file)) {
+                if (Is-VirtualApiSet -Name $dep) {
+                  continue
+                }
                 $depKey = $dep.ToLowerInvariant()
                 if ($resolved.ContainsKey($depKey) -or $missing.Contains($depKey)) {
                   continue
@@ -366,7 +391,9 @@ jobs:
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
           $env:GLOBALPLATFORM_LOGFILE = $log
-          & .\build\test_gp.exe
+          Push-Location $buildDir
+          & .\test_gp.exe
+          Pop-Location
           $rc = $LASTEXITCODE
           $rcUnsigned = [uint32]([int64]$rc -band 0xffffffffL)
           $rcHex = "0x{0:X8}" -f $rcUnsigned
@@ -486,13 +513,27 @@ jobs:
           $buildDir = Join-Path $PWD 'build-static'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
+          $opensslModulesSrc = Join-Path $binRoot 'ossl-modules'
+          $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
+          if (Test-Path $opensslModulesSrc) {
+            Copy-Item $opensslModulesSrc -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+            $env:OPENSSL_MODULES = $opensslModulesDest
+            Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
+          }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
+          if ($env:OPENSSL_MODULES) {
+            Write-Host "OPENSSL_MODULES=$env:OPENSSL_MODULES"
+          } else {
+            Write-Host "OPENSSL_MODULES not set"
+          }
           Write-Host "---- build-static DLL presence ----"
           Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
           Write-Host "globalplatform.dll: $(Test-Path $globalplatformCopy)"
           Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
           Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
+          Write-Host "legacy.dll: $(Test-Path (Join-Path $buildDir 'legacy.dll'))"
+          Write-Host "default.dll: $(Test-Path (Join-Path $buildDir 'default.dll'))"
           Write-Host "---- end ----"
           $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
           if ($dumpbin) {
@@ -531,6 +572,14 @@ jobs:
                 }
               }
               return $deps
+            }
+            function Is-VirtualApiSet {
+              param([string]$Name)
+              if (-not $Name) {
+                return $false
+              }
+              $lower = $Name.ToLowerInvariant()
+              return $lower.StartsWith('api-ms-') -or $lower.StartsWith('ext-ms-')
             }
 
             $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
@@ -594,6 +643,9 @@ jobs:
             while ($queue.Count -gt 0) {
               $file = $queue.Dequeue()
               foreach ($dep in (Get-Dependents -Path $file)) {
+                if (Is-VirtualApiSet -Name $dep) {
+                  continue
+                }
                 $depKey = $dep.ToLowerInvariant()
                 if ($resolved.ContainsKey($depKey) -or $missing.Contains($depKey)) {
                   continue
@@ -630,7 +682,9 @@ jobs:
           New-Item -ItemType File -Path $log -Force | Out-Null
           $env:GLOBALPLATFORM_DEBUG = "1"
           $env:GLOBALPLATFORM_LOGFILE = $log
-          & .\build-static\test_gp.exe
+          Push-Location $buildDir
+          & .\test_gp.exe
+          Pop-Location
           $rc = $LASTEXITCODE
           $rcUnsigned = [uint32]([int64]$rc -band 0xffffffffL)
           $rcHex = "0x{0:X8}" -f $rcUnsigned
