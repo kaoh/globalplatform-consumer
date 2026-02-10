@@ -23,13 +23,8 @@ int main(void) {
 
     set_tchar_field(ctx.libraryName, sizeof(ctx.libraryName) / sizeof(TCHAR),
                     _T("gppcscconnectionplugin"));
-#ifdef _WIN32
-    set_tchar_field(ctx.libraryVersion, sizeof(ctx.libraryVersion) / sizeof(TCHAR),
-                    _T(""));
-#else
     set_tchar_field(ctx.libraryVersion, sizeof(ctx.libraryVersion) / sizeof(TCHAR),
                     _T("1"));
-#endif
 
     OPGP_ERROR_STATUS rc = OPGP_establish_context(&ctx);
     if (OPGP_ERROR_CHECK(rc)) {
