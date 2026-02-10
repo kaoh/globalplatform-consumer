@@ -269,7 +269,7 @@ jobs:
               return $deps
             }
 
-            $searchPaths = New-Object System.Collections.Generic.HashSet[string]
+            $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
             function Add-SearchPath {
               param([string]$Path)
               if ($Path -and (Test-Path $Path)) {
@@ -303,10 +303,10 @@ jobs:
               return $null
             }
 
-            $queue = New-Object System.Collections.Generic.Queue[string]
-            $scanned = New-Object System.Collections.Generic.HashSet[string]
-            $resolved = New-Object System.Collections.Generic.Dictionary[string,string]
-            $missing = New-Object System.Collections.Generic.HashSet[string]
+            $queue = [System.Collections.Generic.Queue[string]]::new()
+            $scanned = [System.Collections.Generic.HashSet[string]]::new()
+            $resolved = [System.Collections.Generic.Dictionary[string,string]]::new()
+            $missing = [System.Collections.Generic.HashSet[string]]::new()
             $filesToScan = @(
               (Join-Path $buildDir 'test_gp.exe'),
               $globalplatformCopy,
@@ -533,7 +533,7 @@ jobs:
               return $deps
             }
 
-            $searchPaths = New-Object System.Collections.Generic.HashSet[string]
+            $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
             function Add-SearchPath {
               param([string]$Path)
               if ($Path -and (Test-Path $Path)) {
@@ -567,10 +567,10 @@ jobs:
               return $null
             }
 
-            $queue = New-Object System.Collections.Generic.Queue[string]
-            $scanned = New-Object System.Collections.Generic.HashSet[string]
-            $resolved = New-Object System.Collections.Generic.Dictionary[string,string]
-            $missing = New-Object System.Collections.Generic.HashSet[string]
+            $queue = [System.Collections.Generic.Queue[string]]::new()
+            $scanned = [System.Collections.Generic.HashSet[string]]::new()
+            $resolved = [System.Collections.Generic.Dictionary[string,string]]::new()
+            $missing = [System.Collections.Generic.HashSet[string]]::new()
             $filesToScan = @(
               (Join-Path $buildDir 'test_gp.exe'),
               $globalplatformCopy,
