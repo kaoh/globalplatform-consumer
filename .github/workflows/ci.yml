@@ -222,17 +222,46 @@ jobs:
           $buildDir = Join-Path $PWD 'build'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
-          $opensslModulesDir = Get-ChildItem -Path $installRoot -Recurse -Directory -Filter 'ossl-modules' |
-            Where-Object { $_.FullName -notmatch '\\debug\\' } |
-            Select-Object -First 1
+          $opensslModulesDir = $null
+          $searchRoots = @($installRoot)
+          if ($env:VCPKG_ROOT) {
+            $searchRoots += (Join-Path $env:VCPKG_ROOT 'installed')
+            $searchRoots += (Join-Path $env:VCPKG_ROOT 'packages')
+          }
+          foreach ($root in $searchRoots) {
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
+            }
+            $modulesDir = Get-ChildItem -Path $root -Recurse -Directory -Filter 'ossl-modules' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($modulesDir) {
+              $opensslModulesDir = $modulesDir
+              break
+            }
+            $defaultProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'default.dll' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($defaultProvider) {
+              $opensslModulesDir = Split-Path $defaultProvider.FullName -Parent
+              break
+            }
+            $legacyProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'legacy.dll' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($legacyProvider) {
+              $opensslModulesDir = Split-Path $legacyProvider.FullName -Parent
+              break
+            }
+          }
           if ($opensslModulesDir) {
             $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
-            Copy-Item $opensslModulesDir.FullName -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item $opensslModulesDir -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
             $env:OPENSSL_MODULES = $opensslModulesDest
             Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
-            Write-Host "OpenSSL modules: $($opensslModulesDir.FullName) -> $opensslModulesDest"
+            Write-Host "OpenSSL modules: $opensslModulesDir -> $opensslModulesDest"
           } else {
-            Write-Host "OpenSSL modules not found under $installRoot"
+            Write-Host "OpenSSL modules not found under install or vcpkg roots"
           }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
@@ -518,17 +547,46 @@ jobs:
           $buildDir = Join-Path $PWD 'build-static'
           $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
           $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
-          $opensslModulesDir = Get-ChildItem -Path $installRoot -Recurse -Directory -Filter 'ossl-modules' |
-            Where-Object { $_.FullName -notmatch '\\debug\\' } |
-            Select-Object -First 1
+          $opensslModulesDir = $null
+          $searchRoots = @($installRoot)
+          if ($env:VCPKG_ROOT) {
+            $searchRoots += (Join-Path $env:VCPKG_ROOT 'installed')
+            $searchRoots += (Join-Path $env:VCPKG_ROOT 'packages')
+          }
+          foreach ($root in $searchRoots) {
+            if (-not $root -or -not (Test-Path $root)) {
+              continue
+            }
+            $modulesDir = Get-ChildItem -Path $root -Recurse -Directory -Filter 'ossl-modules' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($modulesDir) {
+              $opensslModulesDir = $modulesDir
+              break
+            }
+            $defaultProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'default.dll' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($defaultProvider) {
+              $opensslModulesDir = Split-Path $defaultProvider.FullName -Parent
+              break
+            }
+            $legacyProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'legacy.dll' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+            if ($legacyProvider) {
+              $opensslModulesDir = Split-Path $legacyProvider.FullName -Parent
+              break
+            }
+          }
           if ($opensslModulesDir) {
             $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
-            Copy-Item $opensslModulesDir.FullName -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item $opensslModulesDir -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
             $env:OPENSSL_MODULES = $opensslModulesDest
             Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
-            Write-Host "OpenSSL modules: $($opensslModulesDir.FullName) -> $opensslModulesDest"
+            Write-Host "OpenSSL modules: $opensslModulesDir -> $opensslModulesDest"
           } else {
-            Write-Host "OpenSSL modules not found under $installRoot"
+            Write-Host "OpenSSL modules not found under install or vcpkg roots"
           }
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
