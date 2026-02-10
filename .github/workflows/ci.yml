@@ -220,20 +220,21 @@ jobs:
             throw "test_gp.exe not found in build output"
           }
           $buildDir = Join-Path $PWD 'build'
+          $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
+          $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
           Write-Host "---- build DLL presence ----"
-          Write-Host "gppcscconnectionplugin.dll: $(Test-Path (Join-Path $buildDir 'gppcscconnectionplugin.dll'))"
-          Write-Host "globalplatform.dll: $(Test-Path (Join-Path $buildDir 'globalplatform.dll'))"
+          Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
+          Write-Host "globalplatform.dll: $(Test-Path $globalplatformCopy)"
           Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
           Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
           Write-Host "---- end ----"
           $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
           if ($dumpbin) {
             Write-Host "---- test_gp.exe dependencies ----"
-            & $dumpbin /dependents .\build\test_gp.exe
+            & $dumpbin /dependents (Join-Path $buildDir 'test_gp.exe')
             Write-Host "---- end ----"
-            $globalplatformCopy = Join-Path $PWD 'build\globalplatform.dll'
             if (Test-Path $globalplatformCopy) {
               Write-Host "---- globalplatform.dll dependencies ----"
               & $dumpbin /dependents $globalplatformCopy
@@ -243,11 +244,74 @@ jobs:
               & $dumpbin /dependents $globalplatform.FullName
               Write-Host "---- end ----"
             }
-            if ($plugin) {
+            if (Test-Path $pluginCopy) {
+              Write-Host "---- gppcscconnectionplugin.dll dependencies ----"
+              & $dumpbin /dependents $pluginCopy
+              Write-Host "---- end ----"
+            } elseif ($plugin) {
               Write-Host "---- $($plugin.FullName) dependencies ----"
               & $dumpbin /dependents $plugin.FullName
               Write-Host "---- end ----"
             }
+
+            function Get-Dependents {
+              param([string]$Path)
+              if (-not (Test-Path $Path)) {
+                return @()
+              }
+              $lines = & $dumpbin /dependents $Path 2>$null
+              $deps = @()
+              foreach ($line in $lines) {
+                if ($line -match '^\s+([A-Za-z0-9._-]+\.dll)\s*$') {
+                  $deps += $matches[1]
+                }
+              }
+              return $deps
+            }
+
+            $deps = New-Object System.Collections.Generic.HashSet[string]
+            $filesToScan = @(
+              (Join-Path $buildDir 'test_gp.exe'),
+              $globalplatformCopy,
+              $pluginCopy
+            )
+            foreach ($file in $filesToScan) {
+              foreach ($dep in (Get-Dependents -Path $file)) {
+                $null = $deps.Add($dep.ToLowerInvariant())
+              }
+            }
+
+            $searchPaths = @()
+            $searchPaths += $buildDir
+            if ($env:SystemRoot) {
+              $searchPaths += (Join-Path $env:SystemRoot 'System32')
+              $searchPaths += (Join-Path $env:SystemRoot 'SysWOW64')
+              $searchPaths += $env:SystemRoot
+            }
+            foreach ($p in ($env:PATH -split ';')) {
+              if ($p) {
+                $searchPaths += $p
+              }
+            }
+            $searchPaths = $searchPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+
+            Write-Host "---- dependency resolution ----"
+            foreach ($dep in ($deps | Sort-Object)) {
+              $found = $null
+              foreach ($dir in $searchPaths) {
+                $candidate = Join-Path $dir $dep
+                if (Test-Path $candidate) {
+                  $found = $candidate
+                  break
+                }
+              }
+              if ($found) {
+                Write-Host "$dep -> $found"
+              } else {
+                Write-Host "$dep -> MISSING"
+              }
+            }
+            Write-Host "---- end ----"
           } else {
             Write-Host "dumpbin.exe not found"
           }
@@ -373,11 +437,13 @@ jobs:
             throw "test_gp.exe not found in build-static output"
           }
           $buildDir = Join-Path $PWD 'build-static'
+          $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
+          $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
           $env:OPGP_PLUGIN_PATH = $buildDir
           Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
           Write-Host "---- build-static DLL presence ----"
-          Write-Host "gppcscconnectionplugin.dll: $(Test-Path (Join-Path $buildDir 'gppcscconnectionplugin.dll'))"
-          Write-Host "globalplatform.dll: $(Test-Path (Join-Path $buildDir 'globalplatform.dll'))"
+          Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
+          Write-Host "globalplatform.dll: $(Test-Path $globalplatformCopy)"
           Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
           Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
           Write-Host "---- end ----"
@@ -386,7 +452,6 @@ jobs:
             Write-Host "---- test_gp.exe dependencies (static) ----"
             & $dumpbin /dependents .\build-static\test_gp.exe
             Write-Host "---- end ----"
-            $globalplatformCopy = Join-Path $PWD 'build-static\globalplatform.dll'
             if (Test-Path $globalplatformCopy) {
               Write-Host "---- globalplatform.dll dependencies (static) ----"
               & $dumpbin /dependents $globalplatformCopy
@@ -396,11 +461,74 @@ jobs:
               & $dumpbin /dependents $globalplatform.FullName
               Write-Host "---- end ----"
             }
-            if ($plugin) {
+            if (Test-Path $pluginCopy) {
+              Write-Host "---- gppcscconnectionplugin.dll dependencies (static) ----"
+              & $dumpbin /dependents $pluginCopy
+              Write-Host "---- end ----"
+            } elseif ($plugin) {
               Write-Host "---- $($plugin.FullName) dependencies ----"
               & $dumpbin /dependents $plugin.FullName
               Write-Host "---- end ----"
             }
+
+            function Get-Dependents {
+              param([string]$Path)
+              if (-not (Test-Path $Path)) {
+                return @()
+              }
+              $lines = & $dumpbin /dependents $Path 2>$null
+              $deps = @()
+              foreach ($line in $lines) {
+                if ($line -match '^\s+([A-Za-z0-9._-]+\.dll)\s*$') {
+                  $deps += $matches[1]
+                }
+              }
+              return $deps
+            }
+
+            $deps = New-Object System.Collections.Generic.HashSet[string]
+            $filesToScan = @(
+              (Join-Path $buildDir 'test_gp.exe'),
+              $globalplatformCopy,
+              $pluginCopy
+            )
+            foreach ($file in $filesToScan) {
+              foreach ($dep in (Get-Dependents -Path $file)) {
+                $null = $deps.Add($dep.ToLowerInvariant())
+              }
+            }
+
+            $searchPaths = @()
+            $searchPaths += $buildDir
+            if ($env:SystemRoot) {
+              $searchPaths += (Join-Path $env:SystemRoot 'System32')
+              $searchPaths += (Join-Path $env:SystemRoot 'SysWOW64')
+              $searchPaths += $env:SystemRoot
+            }
+            foreach ($p in ($env:PATH -split ';')) {
+              if ($p) {
+                $searchPaths += $p
+              }
+            }
+            $searchPaths = $searchPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+
+            Write-Host "---- dependency resolution ----"
+            foreach ($dep in ($deps | Sort-Object)) {
+              $found = $null
+              foreach ($dir in $searchPaths) {
+                $candidate = Join-Path $dir $dep
+                if (Test-Path $candidate) {
+                  $found = $candidate
+                  break
+                }
+              }
+              if ($found) {
+                Write-Host "$dep -> $found"
+              } else {
+                Write-Host "$dep -> MISSING"
+              }
+            }
+            Write-Host "---- end ----"
           } else {
             Write-Host "dumpbin.exe not found"
           }
