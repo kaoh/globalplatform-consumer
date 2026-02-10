@@ -259,7 +259,7 @@ jobs:
               if (-not (Test-Path $Path)) {
                 return @()
               }
-              $lines = & $dumpbin /dependents $Path 2>$null
+              $lines = & $dumpbin /dependents /nologo $Path 2>$null
               $deps = @()
               foreach ($line in $lines) {
                 if ($line -match '^\s+([A-Za-z0-9._-]+\.dll)\s*$') {
@@ -269,47 +269,94 @@ jobs:
               return $deps
             }
 
-            $deps = New-Object System.Collections.Generic.HashSet[string]
+            $searchPaths = New-Object System.Collections.Generic.HashSet[string]
+            function Add-SearchPath {
+              param([string]$Path)
+              if ($Path -and (Test-Path $Path)) {
+                $null = $searchPaths.Add($Path)
+              }
+            }
+            Add-SearchPath $buildDir
+            if ($env:SystemRoot) {
+              Add-SearchPath (Join-Path $env:SystemRoot 'System32')
+              Add-SearchPath (Join-Path $env:SystemRoot 'SysWOW64')
+              Add-SearchPath $env:SystemRoot
+            }
+            foreach ($p in ($env:PATH -split ';')) {
+              Add-SearchPath $p
+            }
+            if ($plugin) {
+              Add-SearchPath (Split-Path $plugin.FullName -Parent)
+            }
+            if ($globalplatform) {
+              Add-SearchPath (Split-Path $globalplatform.FullName -Parent)
+            }
+
+            function Find-Dependency {
+              param([string]$Name)
+              foreach ($dir in $searchPaths) {
+                $candidate = Join-Path $dir $Name
+                if (Test-Path $candidate) {
+                  return $candidate
+                }
+              }
+              return $null
+            }
+
+            $queue = New-Object System.Collections.Generic.Queue[string]
+            $scanned = New-Object System.Collections.Generic.HashSet[string]
+            $resolved = New-Object System.Collections.Generic.Dictionary[string,string]
+            $missing = New-Object System.Collections.Generic.HashSet[string]
             $filesToScan = @(
               (Join-Path $buildDir 'test_gp.exe'),
               $globalplatformCopy,
               $pluginCopy
             )
             foreach ($file in $filesToScan) {
-              foreach ($dep in (Get-Dependents -Path $file)) {
-                $null = $deps.Add($dep.ToLowerInvariant())
-              }
-            }
-
-            $searchPaths = @()
-            $searchPaths += $buildDir
-            if ($env:SystemRoot) {
-              $searchPaths += (Join-Path $env:SystemRoot 'System32')
-              $searchPaths += (Join-Path $env:SystemRoot 'SysWOW64')
-              $searchPaths += $env:SystemRoot
-            }
-            foreach ($p in ($env:PATH -split ';')) {
-              if ($p) {
-                $searchPaths += $p
-              }
-            }
-            $searchPaths = $searchPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
-
-            Write-Host "---- dependency resolution ----"
-            foreach ($dep in ($deps | Sort-Object)) {
-              $found = $null
-              foreach ($dir in $searchPaths) {
-                $candidate = Join-Path $dir $dep
-                if (Test-Path $candidate) {
-                  $found = $candidate
-                  break
+              if (Test-Path $file) {
+                Add-SearchPath (Split-Path $file -Parent)
+                $fileKey = $file.ToLowerInvariant()
+                if ($scanned.Add($fileKey)) {
+                  $queue.Enqueue($file)
                 }
               }
-              if ($found) {
-                Write-Host "$dep -> $found"
-              } else {
-                Write-Host "$dep -> MISSING"
+            }
+
+            $systemRootLower = $null
+            if ($env:SystemRoot) {
+              $systemRootLower = $env:SystemRoot.ToLowerInvariant()
+            }
+
+            while ($queue.Count -gt 0) {
+              $file = $queue.Dequeue()
+              foreach ($dep in (Get-Dependents -Path $file)) {
+                $depKey = $dep.ToLowerInvariant()
+                if ($resolved.ContainsKey($depKey) -or $missing.Contains($depKey)) {
+                  continue
+                }
+                $depPath = Find-Dependency -Name $dep
+                if ($depPath) {
+                  $resolved[$depKey] = $depPath
+                  Add-SearchPath (Split-Path $depPath -Parent)
+                  $depPathKey = $depPath.ToLowerInvariant()
+                  if (-not $scanned.Contains($depPathKey)) {
+                    $null = $scanned.Add($depPathKey)
+                    if (-not $systemRootLower -or $depPathKey -notlike "$systemRootLower\\*") {
+                      $queue.Enqueue($depPath)
+                    }
+                  }
+                } else {
+                  $null = $missing.Add($depKey)
+                }
               }
+            }
+
+            Write-Host "---- dependency resolution (recursive) ----"
+            foreach ($kvp in ($resolved.GetEnumerator() | Sort-Object Key)) {
+              Write-Host "$($kvp.Key) -> $($kvp.Value)"
+            }
+            foreach ($dep in ($missing | Sort-Object)) {
+              Write-Host "$dep -> MISSING"
             }
             Write-Host "---- end ----"
           } else {
@@ -476,7 +523,7 @@ jobs:
               if (-not (Test-Path $Path)) {
                 return @()
               }
-              $lines = & $dumpbin /dependents $Path 2>$null
+              $lines = & $dumpbin /dependents /nologo $Path 2>$null
               $deps = @()
               foreach ($line in $lines) {
                 if ($line -match '^\s+([A-Za-z0-9._-]+\.dll)\s*$') {
@@ -486,47 +533,94 @@ jobs:
               return $deps
             }
 
-            $deps = New-Object System.Collections.Generic.HashSet[string]
+            $searchPaths = New-Object System.Collections.Generic.HashSet[string]
+            function Add-SearchPath {
+              param([string]$Path)
+              if ($Path -and (Test-Path $Path)) {
+                $null = $searchPaths.Add($Path)
+              }
+            }
+            Add-SearchPath $buildDir
+            if ($env:SystemRoot) {
+              Add-SearchPath (Join-Path $env:SystemRoot 'System32')
+              Add-SearchPath (Join-Path $env:SystemRoot 'SysWOW64')
+              Add-SearchPath $env:SystemRoot
+            }
+            foreach ($p in ($env:PATH -split ';')) {
+              Add-SearchPath $p
+            }
+            if ($plugin) {
+              Add-SearchPath (Split-Path $plugin.FullName -Parent)
+            }
+            if ($globalplatform) {
+              Add-SearchPath (Split-Path $globalplatform.FullName -Parent)
+            }
+
+            function Find-Dependency {
+              param([string]$Name)
+              foreach ($dir in $searchPaths) {
+                $candidate = Join-Path $dir $Name
+                if (Test-Path $candidate) {
+                  return $candidate
+                }
+              }
+              return $null
+            }
+
+            $queue = New-Object System.Collections.Generic.Queue[string]
+            $scanned = New-Object System.Collections.Generic.HashSet[string]
+            $resolved = New-Object System.Collections.Generic.Dictionary[string,string]
+            $missing = New-Object System.Collections.Generic.HashSet[string]
             $filesToScan = @(
               (Join-Path $buildDir 'test_gp.exe'),
               $globalplatformCopy,
               $pluginCopy
             )
             foreach ($file in $filesToScan) {
-              foreach ($dep in (Get-Dependents -Path $file)) {
-                $null = $deps.Add($dep.ToLowerInvariant())
-              }
-            }
-
-            $searchPaths = @()
-            $searchPaths += $buildDir
-            if ($env:SystemRoot) {
-              $searchPaths += (Join-Path $env:SystemRoot 'System32')
-              $searchPaths += (Join-Path $env:SystemRoot 'SysWOW64')
-              $searchPaths += $env:SystemRoot
-            }
-            foreach ($p in ($env:PATH -split ';')) {
-              if ($p) {
-                $searchPaths += $p
-              }
-            }
-            $searchPaths = $searchPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
-
-            Write-Host "---- dependency resolution ----"
-            foreach ($dep in ($deps | Sort-Object)) {
-              $found = $null
-              foreach ($dir in $searchPaths) {
-                $candidate = Join-Path $dir $dep
-                if (Test-Path $candidate) {
-                  $found = $candidate
-                  break
+              if (Test-Path $file) {
+                Add-SearchPath (Split-Path $file -Parent)
+                $fileKey = $file.ToLowerInvariant()
+                if ($scanned.Add($fileKey)) {
+                  $queue.Enqueue($file)
                 }
               }
-              if ($found) {
-                Write-Host "$dep -> $found"
-              } else {
-                Write-Host "$dep -> MISSING"
+            }
+
+            $systemRootLower = $null
+            if ($env:SystemRoot) {
+              $systemRootLower = $env:SystemRoot.ToLowerInvariant()
+            }
+
+            while ($queue.Count -gt 0) {
+              $file = $queue.Dequeue()
+              foreach ($dep in (Get-Dependents -Path $file)) {
+                $depKey = $dep.ToLowerInvariant()
+                if ($resolved.ContainsKey($depKey) -or $missing.Contains($depKey)) {
+                  continue
+                }
+                $depPath = Find-Dependency -Name $dep
+                if ($depPath) {
+                  $resolved[$depKey] = $depPath
+                  Add-SearchPath (Split-Path $depPath -Parent)
+                  $depPathKey = $depPath.ToLowerInvariant()
+                  if (-not $scanned.Contains($depPathKey)) {
+                    $null = $scanned.Add($depPathKey)
+                    if (-not $systemRootLower -or $depPathKey -notlike "$systemRootLower\\*") {
+                      $queue.Enqueue($depPath)
+                    }
+                  }
+                } else {
+                  $null = $missing.Add($depKey)
+                }
               }
+            }
+
+            Write-Host "---- dependency resolution (recursive) ----"
+            foreach ($kvp in ($resolved.GetEnumerator() | Sort-Object Key)) {
+              Write-Host "$($kvp.Key) -> $($kvp.Value)"
+            }
+            foreach ($dep in ($missing | Sort-Object)) {
+              Write-Host "$dep -> MISSING"
             }
             Write-Host "---- end ----"
           } else {
