@@ -211,11 +211,6 @@ jobs:
               Copy-Item $plugin.FullName -Destination .\build -Force -ErrorAction SilentlyContinue
               $pluginDir = Split-Path $plugin.FullName -Parent
               $env:PATH = "$pluginDir;$env:PATH"
-              if ($env:OPGP_PLUGIN_PATH) {
-                $env:OPGP_PLUGIN_PATH = "$pluginDir;$env:OPGP_PLUGIN_PATH"
-              } else {
-                $env:OPGP_PLUGIN_PATH = $pluginDir
-              }
             } else {
               Write-Host "gppcscconnectionplugin.dll not found under $installRoot"
             }
@@ -224,6 +219,15 @@ jobs:
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build output"
           }
+          $buildDir = Join-Path $PWD 'build'
+          $env:OPGP_PLUGIN_PATH = $buildDir
+          Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
+          Write-Host "---- build DLL presence ----"
+          Write-Host "gppcscconnectionplugin.dll: $(Test-Path (Join-Path $buildDir 'gppcscconnectionplugin.dll'))"
+          Write-Host "globalplatform.dll: $(Test-Path (Join-Path $buildDir 'globalplatform.dll'))"
+          Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
+          Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
+          Write-Host "---- end ----"
           $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
           if ($dumpbin) {
             Write-Host "---- test_gp.exe dependencies ----"
@@ -360,11 +364,6 @@ jobs:
               Copy-Item $plugin.FullName -Destination .\build-static -Force -ErrorAction SilentlyContinue
               $pluginDir = Split-Path $plugin.FullName -Parent
               $env:PATH = "$pluginDir;$env:PATH"
-              if ($env:OPGP_PLUGIN_PATH) {
-                $env:OPGP_PLUGIN_PATH = "$pluginDir;$env:OPGP_PLUGIN_PATH"
-              } else {
-                $env:OPGP_PLUGIN_PATH = $pluginDir
-              }
             } else {
               Write-Host "gppcscconnectionplugin.dll not found under $installRoot"
             }
@@ -373,6 +372,15 @@ jobs:
             Get-ChildItem -Recurse -Filter test_gp.exe
             throw "test_gp.exe not found in build-static output"
           }
+          $buildDir = Join-Path $PWD 'build-static'
+          $env:OPGP_PLUGIN_PATH = $buildDir
+          Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
+          Write-Host "---- build-static DLL presence ----"
+          Write-Host "gppcscconnectionplugin.dll: $(Test-Path (Join-Path $buildDir 'gppcscconnectionplugin.dll'))"
+          Write-Host "globalplatform.dll: $(Test-Path (Join-Path $buildDir 'globalplatform.dll'))"
+          Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
+          Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
+          Write-Host "---- end ----"
           $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
           if ($dumpbin) {
             Write-Host "---- test_gp.exe dependencies (static) ----"
