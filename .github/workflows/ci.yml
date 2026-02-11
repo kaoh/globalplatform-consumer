@@ -206,6 +206,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          Write-Host "Skipping Windows run in CI (PC/SC resource manager unavailable on GitHub runners)"
+          exit 0
           $binRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows\bin'
           $installRoot = Join-Path $PWD 'build\vcpkg_installed\x64-windows'
           if (Test-Path $binRoot) {
@@ -362,6 +364,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          Write-Host "Skipping Windows static run in CI (PC/SC resource manager unavailable on GitHub runners)"
+          exit 0
           $binRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static\bin'
           $installRoot = Join-Path $PWD 'build-static\vcpkg_installed\x64-windows-static'
           if (Test-Path $binRoot) {
