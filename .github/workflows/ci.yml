@@ -72,7 +72,27 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Start-Service -Name SCardSvr
+          $svc = Get-Service -Name SCardSvr -ErrorAction SilentlyContinue
+          if (-not $svc) {
+            throw "SCardSvr service not found"
+          }
+          if ($svc.StartType -eq 'Disabled') {
+            & sc.exe config SCardSvr start= demand | Write-Host
+          }
+          for ($i = 0; $i -lt 10; $i++) {
+            $svc = Get-Service -Name SCardSvr -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -eq 'Running') {
+              break
+            }
+            Start-Service -Name SCardSvr -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+          }
+          $svc = Get-Service -Name SCardSvr -ErrorAction SilentlyContinue
+          Write-Host "SCardSvr status: $($svc.Status)"
+          if (-not $svc -or $svc.Status -ne 'Running') {
+            & sc.exe query SCardSvr | Write-Host
+            throw "SCardSvr did not start"
+          }
 
       - name: Clone vcpkg (Unix)
         if: runner.os != 'Windows'
