@@ -201,8 +201,6 @@ jobs:
             if ($globalplatform) {
               Copy-Item $globalplatform.FullName -Destination .\build -Force -ErrorAction SilentlyContinue
               $env:PATH = "$(Split-Path $globalplatform.FullName -Parent);$env:PATH"
-            } else {
-              Write-Host "globalplatform.dll not found under $installRoot"
             }
             $plugin = Get-ChildItem -Path $installRoot -Recurse -Filter 'gppcscconnectionplugin.dll' |
               Where-Object { $_.FullName -notmatch '\\debug\\' } |
@@ -211,8 +209,6 @@ jobs:
               Copy-Item $plugin.FullName -Destination .\build -Force -ErrorAction SilentlyContinue
               $pluginDir = Split-Path $plugin.FullName -Parent
               $env:PATH = "$pluginDir;$env:PATH"
-            } else {
-              Write-Host "gppcscconnectionplugin.dll not found under $installRoot"
             }
           }
           if (-not (Test-Path .\build\test_gp.exe)) {
@@ -220,12 +216,8 @@ jobs:
             throw "test_gp.exe not found in build output"
           }
           $buildDir = Join-Path $PWD 'build'
-          $globalplatformCopy = Join-Path $buildDir 'globalplatform.dll'
-          $pluginCopy = Join-Path $buildDir 'gppcscconnectionplugin.dll'
           $env:PATH = "$buildDir;$env:PATH"
           $opensslModulesDir = $null
-          $defaultProviderPath = $null
-          $legacyProviderPath = $null
           $searchRoots = @($installRoot)
           if ($env:VCPKG_ROOT) {
             $searchRoots += (Join-Path $env:VCPKG_ROOT 'installed')
@@ -243,298 +235,22 @@ jobs:
               break
             }
           }
-          foreach ($root in $searchRoots) {
-            if ($defaultProviderPath) {
-              break
-            }
-            if (-not $root -or -not (Test-Path $root)) {
-              continue
-            }
-            $defaultProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'default.dll' -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -notmatch '\\debug\\' } |
-              Select-Object -First 1
-            if ($defaultProvider) {
-              $defaultProviderPath = $defaultProvider.FullName
-            }
-          }
-          foreach ($root in $searchRoots) {
-            if ($legacyProviderPath) {
-              break
-            }
-            if (-not $root -or -not (Test-Path $root)) {
-              continue
-            }
-            $legacyProvider = Get-ChildItem -Path $root -Recurse -File -Filter 'legacy.dll' -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -notmatch '\\debug\\' } |
-              Select-Object -First 1
-            if ($legacyProvider) {
-              $legacyProviderPath = $legacyProvider.FullName
-            }
-          }
-          if (-not $opensslModulesDir) {
-            if ($defaultProviderPath) {
-              $opensslModulesDir = Split-Path $defaultProviderPath -Parent
-            } elseif ($legacyProviderPath) {
-              $opensslModulesDir = Split-Path $legacyProviderPath -Parent
-            }
-          }
           if ($opensslModulesDir) {
             $opensslModulesDest = Join-Path $buildDir 'ossl-modules'
             Copy-Item $opensslModulesDir -Destination $opensslModulesDest -Recurse -Force -ErrorAction SilentlyContinue
             $env:OPENSSL_MODULES = $opensslModulesDest
             Copy-Item (Join-Path $opensslModulesDest '*.dll') -Destination $buildDir -Force -ErrorAction SilentlyContinue
-            Write-Host "OpenSSL modules: $opensslModulesDir -> $opensslModulesDest"
-          } else {
-            Write-Host "OpenSSL modules not found under install or vcpkg roots"
           }
           $env:OPGP_PLUGIN_PATH = $buildDir
-          Write-Host "OPGP_PLUGIN_PATH=$env:OPGP_PLUGIN_PATH"
-          if ($env:OPENSSL_MODULES) {
-            Write-Host "OPENSSL_MODULES=$env:OPENSSL_MODULES"
+          $scard = Get-Service -Name SCardSvr -ErrorAction SilentlyContinue
+          if ($scard) {
+            if ($scard.Status -ne 'Running') {
+              Start-Service -Name SCardSvr -ErrorAction SilentlyContinue
+              $scard = Get-Service -Name SCardSvr -ErrorAction SilentlyContinue
+            }
+            Write-Host "SCardSvr status: $($scard.Status)"
           } else {
-            Write-Host "OPENSSL_MODULES not set"
-          }
-          if ($defaultProviderPath) {
-            Write-Host "OpenSSL default provider: $defaultProviderPath"
-          } else {
-            Write-Host "OpenSSL default provider: not found"
-          }
-          if ($legacyProviderPath) {
-            Write-Host "OpenSSL legacy provider: $legacyProviderPath"
-          } else {
-            Write-Host "OpenSSL legacy provider: not found"
-          }
-          Write-Host "---- build DLL presence ----"
-          Write-Host "gppcscconnectionplugin.dll: $(Test-Path $pluginCopy)"
-          Write-Host "globalplatform.dll: $(Test-Path $globalplatformCopy)"
-          Write-Host "libcrypto-3-x64.dll: $(Test-Path (Join-Path $buildDir 'libcrypto-3-x64.dll'))"
-          Write-Host "zlib1.dll: $(Test-Path (Join-Path $buildDir 'zlib1.dll'))"
-          Write-Host "legacy.dll: $(Test-Path (Join-Path $buildDir 'legacy.dll'))"
-          Write-Host "default.dll: $(Test-Path (Join-Path $buildDir 'default.dll'))"
-          Write-Host "---- end ----"
-          $dumpbin = (Get-Command dumpbin.exe -ErrorAction SilentlyContinue).Source
-          if ($dumpbin) {
-            Write-Host "---- test_gp.exe dependencies ----"
-            & $dumpbin /dependents (Join-Path $buildDir 'test_gp.exe')
-            Write-Host "---- end ----"
-            if (Test-Path $globalplatformCopy) {
-              Write-Host "---- globalplatform.dll dependencies ----"
-              & $dumpbin /dependents $globalplatformCopy
-              Write-Host "---- end ----"
-            } elseif ($globalplatform) {
-              Write-Host "---- $($globalplatform.FullName) dependencies ----"
-              & $dumpbin /dependents $globalplatform.FullName
-              Write-Host "---- end ----"
-            }
-            if (Test-Path $pluginCopy) {
-              Write-Host "---- gppcscconnectionplugin.dll dependencies ----"
-              & $dumpbin /dependents $pluginCopy
-              Write-Host "---- end ----"
-            } elseif ($plugin) {
-              Write-Host "---- $($plugin.FullName) dependencies ----"
-              & $dumpbin /dependents $plugin.FullName
-              Write-Host "---- end ----"
-            }
-
-            function Get-Dependents {
-              param([string]$Path)
-              if (-not (Test-Path $Path)) {
-                return @()
-              }
-              $lines = & $dumpbin /dependents /nologo $Path 2>$null
-              $deps = @()
-              foreach ($line in $lines) {
-                if ($line -match '^\s+([A-Za-z0-9._-]+\.dll)\s*$') {
-                  $deps += $matches[1]
-                }
-              }
-              return $deps
-            }
-            function Is-VirtualApiSet {
-              param([string]$Name)
-              if (-not $Name) {
-                return $false
-              }
-              $lower = $Name.ToLowerInvariant()
-              return $lower.StartsWith('api-ms-') -or $lower.StartsWith('ext-ms-')
-            }
-            function Show-WherePaths {
-              param([string]$Label, [string]$Path)
-              $deps = Get-Dependents -Path $Path
-              if (-not $deps -or $deps.Count -eq 0) {
-                Write-Host "No dependencies parsed for $Label"
-                return
-              }
-              Write-Host "---- $Label dependency locations (where.exe) ----"
-              foreach ($dep in ($deps | Sort-Object -Unique)) {
-                $found = & where.exe $dep 2>$null
-                if ($LASTEXITCODE -eq 0 -and $found) {
-                  foreach ($f in $found) {
-                    Write-Host "$dep -> $f"
-                  }
-                } else {
-                  Write-Host "$dep -> NOT FOUND on PATH"
-                }
-              }
-              Write-Host "---- end ----"
-            }
-
-            Show-WherePaths -Label "test_gp.exe" -Path (Join-Path $buildDir 'test_gp.exe')
-            if (Test-Path $globalplatformCopy) {
-              Show-WherePaths -Label "globalplatform.dll" -Path $globalplatformCopy
-            } elseif ($globalplatform) {
-              Show-WherePaths -Label $globalplatform.FullName -Path $globalplatform.FullName
-            }
-            if (Test-Path $pluginCopy) {
-              Show-WherePaths -Label "gppcscconnectionplugin.dll" -Path $pluginCopy
-            } elseif ($plugin) {
-              Show-WherePaths -Label $plugin.FullName -Path $plugin.FullName
-            }
-
-            $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
-            function Add-SearchPath {
-              param([string]$Path)
-              if ($Path -and (Test-Path $Path)) {
-                $null = $searchPaths.Add($Path)
-              }
-            }
-            Add-SearchPath $buildDir
-            if ($env:SystemRoot) {
-              Add-SearchPath (Join-Path $env:SystemRoot 'System32')
-              Add-SearchPath (Join-Path $env:SystemRoot 'SysWOW64')
-              Add-SearchPath $env:SystemRoot
-            }
-            foreach ($p in ($env:PATH -split ';')) {
-              Add-SearchPath $p
-            }
-            if ($plugin) {
-              Add-SearchPath (Split-Path $plugin.FullName -Parent)
-            }
-            if ($globalplatform) {
-              Add-SearchPath (Split-Path $globalplatform.FullName -Parent)
-            }
-
-            function Find-Dependency {
-              param([string]$Name)
-              foreach ($dir in $searchPaths) {
-                $candidate = Join-Path $dir $Name
-                if (Test-Path $candidate) {
-                  return $candidate
-                }
-              }
-              return $null
-            }
-
-            $queue = [System.Collections.Generic.Queue[string]]::new()
-            $scanned = [System.Collections.Generic.HashSet[string]]::new()
-            $resolved = [System.Collections.Generic.Dictionary[string,string]]::new()
-            $missing = [System.Collections.Generic.HashSet[string]]::new()
-            $filesToScan = @(
-              (Join-Path $buildDir 'test_gp.exe'),
-              $globalplatformCopy,
-              $pluginCopy
-            )
-            foreach ($file in $filesToScan) {
-              if (Test-Path $file) {
-                Add-SearchPath (Split-Path $file -Parent)
-                $fileKey = $file.ToLowerInvariant()
-                if ($scanned.Add($fileKey)) {
-                  $queue.Enqueue($file)
-                }
-              }
-            }
-
-            $systemRootLower = $null
-            if ($env:SystemRoot) {
-              $systemRootLower = $env:SystemRoot.ToLowerInvariant()
-            }
-
-            while ($queue.Count -gt 0) {
-              $file = $queue.Dequeue()
-              foreach ($dep in (Get-Dependents -Path $file)) {
-                if (Is-VirtualApiSet -Name $dep) {
-                  continue
-                }
-                $depKey = $dep.ToLowerInvariant()
-                if ($resolved.ContainsKey($depKey) -or $missing.Contains($depKey)) {
-                  continue
-                }
-                $depPath = Find-Dependency -Name $dep
-                if ($depPath) {
-                  $resolved[$depKey] = $depPath
-                  Add-SearchPath (Split-Path $depPath -Parent)
-                  $depPathKey = $depPath.ToLowerInvariant()
-                  if (-not $scanned.Contains($depPathKey)) {
-                    $null = $scanned.Add($depPathKey)
-                    if (-not $systemRootLower -or $depPathKey -notlike "$systemRootLower\\*") {
-                      $queue.Enqueue($depPath)
-                    }
-                  }
-                } else {
-                  $null = $missing.Add($depKey)
-                }
-              }
-            }
-
-            Write-Host "---- dependency resolution (recursive) ----"
-            foreach ($kvp in ($resolved.GetEnumerator() | Sort-Object Key)) {
-              Write-Host "$($kvp.Key) -> $($kvp.Value)"
-            }
-            foreach ($dep in ($missing | Sort-Object)) {
-              Write-Host "$dep -> MISSING"
-            }
-            Write-Host "---- end ----"
-          } else {
-            Write-Host "dumpbin.exe not found"
-          }
-          $gflags = (Get-Command gflags.exe -ErrorAction SilentlyContinue).Source
-          if (-not $gflags -and $env:WindowsSdkDir) {
-            $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x64\\gflags.exe"
-            if (Test-Path $candidate) {
-              $gflags = $candidate
-            } else {
-              $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x86\\gflags.exe"
-              if (Test-Path $candidate) {
-                $gflags = $candidate
-              }
-            }
-          }
-          if ($gflags) {
-            Write-Host "Enabling loader snaps with $gflags"
-            & $gflags /i (Join-Path $buildDir 'test_gp.exe') +sls | Write-Host
-          } else {
-            Write-Host "gflags.exe not found; loader snaps disabled"
-          }
-          $cdb = (Get-Command cdb.exe -ErrorAction SilentlyContinue).Source
-          if (-not $cdb -and $env:WindowsSdkDir) {
-            $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x64\\cdb.exe"
-            if (Test-Path $candidate) {
-              $cdb = $candidate
-            } else {
-              $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x86\\cdb.exe"
-              if (Test-Path $candidate) {
-                $cdb = $candidate
-              }
-            }
-          }
-          if ($cdb) {
-            $snapLog = Join-Path $env:RUNNER_TEMP ("loader-snaps-" + [System.Guid]::NewGuid().ToString() + ".log")
-            $snapGpLog = Join-Path $env:RUNNER_TEMP ("globalplatform-snap-" + [System.Guid]::NewGuid().ToString() + ".log")
-            New-Item -ItemType File -Path $snapGpLog -Force | Out-Null
-            $env:GLOBALPLATFORM_DEBUG = "1"
-            $env:GLOBALPLATFORM_LOGFILE = $snapGpLog
-            Write-Host "---- loader snaps (cdb) ----"
-            Push-Location $buildDir
-            & $cdb -o -g -G -c "g; q" .\test_gp.exe 2>&1 | Tee-Object -FilePath $snapLog
-            Pop-Location
-            Write-Host "---- end ----"
-            if (Test-Path $snapGpLog) {
-              Write-Host "---- GLOBALPLATFORM_LOGFILE (snap) ($snapGpLog) ----"
-              Get-Content -Path $snapGpLog
-              Write-Host "---- end ----"
-            }
-          } else {
-            Write-Host "cdb.exe not found; loader snaps output unavailable"
+            Write-Host "SCardSvr service not found"
           }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
