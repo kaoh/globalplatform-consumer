@@ -358,6 +358,38 @@ jobs:
               $lower = $Name.ToLowerInvariant()
               return $lower.StartsWith('api-ms-') -or $lower.StartsWith('ext-ms-')
             }
+            function Show-WherePaths {
+              param([string]$Label, [string]$Path)
+              $deps = Get-Dependents -Path $Path
+              if (-not $deps -or $deps.Count -eq 0) {
+                Write-Host "No dependencies parsed for $Label"
+                return
+              }
+              Write-Host "---- $Label dependency locations (where.exe) ----"
+              foreach ($dep in ($deps | Sort-Object -Unique)) {
+                $found = & where.exe $dep 2>$null
+                if ($LASTEXITCODE -eq 0 -and $found) {
+                  foreach ($f in $found) {
+                    Write-Host "$dep -> $f"
+                  }
+                } else {
+                  Write-Host "$dep -> NOT FOUND on PATH"
+                }
+              }
+              Write-Host "---- end ----"
+            }
+
+            Show-WherePaths -Label "test_gp.exe" -Path (Join-Path $buildDir 'test_gp.exe')
+            if (Test-Path $globalplatformCopy) {
+              Show-WherePaths -Label "globalplatform.dll" -Path $globalplatformCopy
+            } elseif ($globalplatform) {
+              Show-WherePaths -Label $globalplatform.FullName -Path $globalplatform.FullName
+            }
+            if (Test-Path $pluginCopy) {
+              Show-WherePaths -Label "gppcscconnectionplugin.dll" -Path $pluginCopy
+            } elseif ($plugin) {
+              Show-WherePaths -Label $plugin.FullName -Path $plugin.FullName
+            }
 
             $searchPaths = [System.Collections.Generic.HashSet[string]]::new()
             function Add-SearchPath {
@@ -454,6 +486,55 @@ jobs:
             Write-Host "---- end ----"
           } else {
             Write-Host "dumpbin.exe not found"
+          }
+          $gflags = (Get-Command gflags.exe -ErrorAction SilentlyContinue).Source
+          if (-not $gflags -and $env:WindowsSdkDir) {
+            $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x64\\gflags.exe"
+            if (Test-Path $candidate) {
+              $gflags = $candidate
+            } else {
+              $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x86\\gflags.exe"
+              if (Test-Path $candidate) {
+                $gflags = $candidate
+              }
+            }
+          }
+          if ($gflags) {
+            Write-Host "Enabling loader snaps with $gflags"
+            & $gflags /i (Join-Path $buildDir 'test_gp.exe') +sls | Write-Host
+          } else {
+            Write-Host "gflags.exe not found; loader snaps disabled"
+          }
+          $cdb = (Get-Command cdb.exe -ErrorAction SilentlyContinue).Source
+          if (-not $cdb -and $env:WindowsSdkDir) {
+            $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x64\\cdb.exe"
+            if (Test-Path $candidate) {
+              $cdb = $candidate
+            } else {
+              $candidate = Join-Path $env:WindowsSdkDir "Debuggers\\x86\\cdb.exe"
+              if (Test-Path $candidate) {
+                $cdb = $candidate
+              }
+            }
+          }
+          if ($cdb) {
+            $snapLog = Join-Path $env:RUNNER_TEMP ("loader-snaps-" + [System.Guid]::NewGuid().ToString() + ".log")
+            $snapGpLog = Join-Path $env:RUNNER_TEMP ("globalplatform-snap-" + [System.Guid]::NewGuid().ToString() + ".log")
+            New-Item -ItemType File -Path $snapGpLog -Force | Out-Null
+            $env:GLOBALPLATFORM_DEBUG = "1"
+            $env:GLOBALPLATFORM_LOGFILE = $snapGpLog
+            Write-Host "---- loader snaps (cdb) ----"
+            Push-Location $buildDir
+            & $cdb -o -g -G -c "g; q" .\test_gp.exe 2>&1 | Tee-Object -FilePath $snapLog
+            Pop-Location
+            Write-Host "---- end ----"
+            if (Test-Path $snapGpLog) {
+              Write-Host "---- GLOBALPLATFORM_LOGFILE (snap) ($snapGpLog) ----"
+              Get-Content -Path $snapGpLog
+              Write-Host "---- end ----"
+            }
+          } else {
+            Write-Host "cdb.exe not found; loader snaps output unavailable"
           }
           $log = Join-Path $env:RUNNER_TEMP ("globalplatform-" + [System.Guid]::NewGuid().ToString() + ".log")
           New-Item -ItemType File -Path $log -Force | Out-Null
