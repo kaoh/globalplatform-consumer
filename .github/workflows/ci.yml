@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  repository_dispatch:
+    types:
+      - vcpkg-registry-update
   workflow_dispatch:
 
 jobs:
