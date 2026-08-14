@@ -2,7 +2,7 @@
   "registries": [
     {
       "kind": "git",
-      "baseline": "7acf21e698aadad9a4a0482b06507a70805279f5",
+      "baseline": "f088d7443d7ffcaf7aadef38aa885328a70bb42b",
       "repository": "https://github.com/kaoh/globalplatform-vcpkg-registry",
       "packages": [
         "globalplatform"
